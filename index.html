@@ -7,9 +7,12 @@
 /* Runs before <body> paints so an unauthenticated visitor never sees the
    calendar flash up behind the login gate. */
 (function(){
-  var KEY = 'school-events-auth-v1';
+  var A = 'school-events-auth-v1', R = 'school-events-role-v1';
   try{
-    if(sessionStorage.getItem(KEY) === 'ok' || localStorage.getItem(KEY) === 'ok') return;
+    var ok = sessionStorage.getItem(A) === 'ok' || localStorage.getItem(A) === 'ok';
+    var role = sessionStorage.getItem(R) || localStorage.getItem(R);
+    // a valid role is required, not just the auth flag
+    if(ok && (role === 'owner' || role === 'guest')) return;
   }catch(e){ /* storage blocked — stay locked */ }
   document.documentElement.classList.add('locked');
 })();
@@ -769,6 +772,34 @@ html.locked .app{display:none}
   font-size:11px;color:var(--text-faint);text-align:center;line-height:1.6;
 }
 
+/* ---------- Role badge + guest restrictions ---------- */
+.role-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 12px;border-radius:999px;font-size:11.5px;font-weight:700;
+  background:var(--accent-soft);color:var(--accent-text);
+  border:1.5px solid color-mix(in srgb,var(--accent) 42%,transparent);
+  white-space:nowrap;
+}
+/* A guest may look, not touch. These are hidden here as well as guarded in
+   code, so nothing mutating is even offered. */
+body.role-guest .tick-btn,
+body.role-guest #dayAdd{display:none !important}
+body.role-guest .chip,
+body.role-guest .ag-card,
+body.role-guest .ev{cursor:default}
+/* Read-only event sheet for guests */
+.modal.readonly .m-body input,
+.modal.readonly .m-body select,
+.modal.readonly .m-body textarea{
+  pointer-events:none;background:var(--panel-soft);
+  border-color:transparent;color:var(--text);
+}
+.modal.readonly .m-body .check{opacity:.75;pointer-events:none}
+.ed-readonly{
+  font-size:12.5px;color:var(--accent-text);font-weight:600;
+  background:var(--accent-soft);border-radius:8px;padding:8px 11px;margin-top:2px;
+}
+
 /* responsive */
 .sb-toggle{display:none}
 @media (max-width:900px){
@@ -911,6 +942,8 @@ html.locked .app{display:none}
 
       <div class="spacer"></div>
 
+      <span class="role-badge" id="roleBadge" style="display:none" title="You signed in with view-only access — events cannot be changed">👁&nbsp; View only</span>
+
       <div class="search">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="color:var(--text-faint);flex:0 0 auto"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
         <input type="text" id="searchBox" placeholder="Search events…">
@@ -999,6 +1032,7 @@ html.locked .app{display:none}
         <textarea id="fDesc" placeholder="Details from the school notice…"></textarea>
       </div>
       <div class="hint" id="edSource" style="display:none"></div>
+      <div class="ed-readonly" id="edReadonly" style="display:none">👁 View-only access — this event cannot be changed.</div>
     </div>
     <div class="m-foot">
       <button class="btn-danger" id="edDelete" style="display:none">Delete</button>
@@ -1167,9 +1201,13 @@ const state = {
   search: '',
   sample: SAMPLE_MODE,
   editingId: null,
+  role: null,           // 'owner' | 'guest' | null — set at sign-in
   sources: [],          // record of every notice ever imported
   imp: null             // live import session (not persisted)
 };
+
+/** Owner = may change anything. Guest = may only look. */
+function canEdit(){ return state.role === 'owner'; }
 
 /* ================================================================
    DATE HELPERS
@@ -1582,8 +1620,9 @@ function renderSearch(vp){
    MODALS
    ================================================================ */
 function openEditor(ev, presetDate){
+  const owner = canEdit();
   state.editingId = ev ? ev.id : null;
-  document.getElementById('edTitle').textContent = ev ? 'Edit Event' : 'New Event';
+  document.getElementById('edTitle').textContent = ev ? (owner ? 'Edit Event' : 'Event details') : 'New Event';
   document.getElementById('fTitle').value  = ev ? ev.title : '';
   document.getElementById('fDate').value   = ev ? ev.date : (presetDate || ymd(new Date()));
   document.getElementById('fStart').value  = ev && ev.start ? ev.start : '';
@@ -1593,25 +1632,40 @@ function openEditor(ev, presetDate){
   document.getElementById('fDesc').value   = ev ? (ev.desc||'') : '';
   document.getElementById('fAllDay').checked = ev ? !!ev.allDay : true;
   document.getElementById('fCat').value    = ev ? ev.cat : 'school';
-  document.getElementById('edDelete').style.display = ev ? 'block' : 'none';
+  document.getElementById('edDelete').style.display = (owner && ev) ? 'block' : 'none';
+  document.getElementById('edSave').style.display = owner ? '' : 'none';
+
+  // guests get a read-only sheet, not an editor
+  const modal = document.querySelector('#ovEditor .modal');
+  modal.classList.toggle('readonly', !owner);
+  document.getElementById('edReadonly').style.display = owner ? 'none' : '';
+  // actually disable the fields, not just style them — a disabled input cannot
+  // be typed into by any route (tab focus, autofill, a script)
+  ['fTitle','fCat','fDate','fEndDate','fLoc','fDesc','fAllDay'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.disabled = !owner;
+  });
+
   const srcEl = document.getElementById('edSource');
   if(ev && ev.src){ srcEl.style.display='block'; srcEl.innerHTML = '&#128206; Source: ' + esc(ev.src); }
   else srcEl.style.display = 'none';
   toggleTimeFields();
   document.getElementById('ovEditor').classList.add('open');
-  setTimeout(()=>document.getElementById('fTitle').focus(),60);
+  if(owner) setTimeout(()=>document.getElementById('fTitle').focus(),60);
 }
 function toggleTimeFields(){
   const all = document.getElementById('fAllDay').checked;
-  document.getElementById('fStart').disabled = all;
-  document.getElementById('fEnd').disabled = all;
-  document.getElementById('fStart').style.opacity = all?'.45':'1';
-  document.getElementById('fEnd').style.opacity = all?'.45':'1';
+  const ro = !canEdit();
+  document.getElementById('fStart').disabled = all || ro;
+  document.getElementById('fEnd').disabled = all || ro;
+  document.getElementById('fStart').style.opacity = (all||ro)?'.45':'1';
+  document.getElementById('fEnd').style.opacity = (all||ro)?'.45':'1';
 }
 function closeModals(){
   document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('open'));
 }
 function saveEditor(){
+  if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
   const title = document.getElementById('fTitle').value.trim();
   if(!title){ toast('Please give the event a title.'); return; }
   const allDay = document.getElementById('fAllDay').checked;
@@ -1639,6 +1693,7 @@ function saveEditor(){
   toast(state.editingId ? 'Event updated.' : 'Event added.');
 }
 function deleteEditor(){
+  if(!canEdit()){ toast('View-only access — you cannot delete events.'); return; }
   if(!state.editingId) return;
   if(!confirm('Delete this event? This cannot be undone.')) return;
   state.events = state.events.filter(e=>e.id!==state.editingId);
@@ -1730,6 +1785,7 @@ function exportJSON(){
   toast('Data exported.');
 }
 function importJSON(){
+  if(!canEdit()){ toast('View-only access — you cannot import data.'); return; }
   const inp = document.getElementById('fileInput');
   inp.value = '';
   inp.dataset.mode = 'json';
@@ -1737,6 +1793,7 @@ function importJSON(){
   inp.click();
 }
 function readJsonFile(f){
+  if(!canEdit()){ toast('View-only access — you cannot import data.'); return; }
   const r = new FileReader();
   r.onload = () => {
     try{
@@ -2185,6 +2242,7 @@ function stepState(name, status){
   renderImport();
 }
 async function runImport(file){
+  if(!canEdit()){ toast('View-only access — you cannot import notices.'); return; }
   state.imp = newImportSession(file);
   state.imp.busy = true;
   renderImport();
@@ -2232,6 +2290,7 @@ async function runImport(file){
 }
 
 function commitImport(){
+  if(!canEdit()){ toast('View-only access — you cannot add imported events.'); return; }
   const picked = state.imp.rows.filter(r=>r.on && r.title.trim() && r.date);
   if(!picked.length){ toast('No events selected.'); return; }
   let added = 0, merged = 0;
@@ -2431,6 +2490,7 @@ function wireImport(){
 
   const pasteBtn = document.getElementById('pasteParse');
   if(pasteBtn) pasteBtn.onclick = ()=>{
+    if(!canEdit()){ toast('View-only access — you cannot import notices.'); return; }
     const box = document.getElementById('pasteBox');
     const text = (box && box.value || '').trim();
     if(!text){ toast('Paste the notice text first.'); return; }
@@ -2505,15 +2565,17 @@ function goToday(){
    Real protection would need a server that checks the password.
    ================================================================ */
 const AUTH_SALT = 'sjkc-phei-shin-school-calendar';
-/* Every accepted password, stored ONLY as a salted SHA-256 hash — the plain
-   text is never in this file. Add or remove entries here; to make a new one:
-       sha256(AUTH_SALT + ':' + password)   as lowercase hex
-   Two are configured: a family one and a shared/guest one. */
-const AUTH_HASHES = [
-  '17a9f100fba3699690120c9b938fd66acf36f95c3634bf1281b67d53cb162fd1',
-  'fd1ef335d058d59ece73b9ca4a8a5e353f1a1f639966ba6f95e97756ce3a7520'
-];
+/* Password hash -> role. The plain text is never stored in this file.
+     owner : full access — add, edit, delete, import
+     guest : view only   — can read the calendar, export it, nothing else
+   To add or change a password:
+       sha256(AUTH_SALT + ':' + password)   as lowercase hex            */
+const AUTH_ROLES = {
+  '17a9f100fba3699690120c9b938fd66acf36f95c3634bf1281b67d53cb162fd1': 'owner',
+  'fd1ef335d058d59ece73b9ca4a8a5e353f1a1f639966ba6f95e97756ce3a7520': 'guest'
+};
 const AUTH_KEY  = 'school-events-auth-v1';
+const ROLE_KEY  = 'school-events-role-v1';
 
 /* Self-contained SHA-256 (hex). Written out rather than using
    crypto.subtle so it works identically on file://, localhost and
@@ -2572,25 +2634,41 @@ function sha256Hex(str){
   }
   return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
 }
-function passwordOk(pw){
-  if(!pw) return false;
-  return AUTH_HASHES.indexOf(sha256Hex(AUTH_SALT + ':' + pw)) !== -1;
+function roleForPassword(pw){
+  if(!pw) return null;
+  return AUTH_ROLES[sha256Hex(AUTH_SALT + ':' + pw)] || null;
 }
+function passwordOk(pw){ return roleForPassword(pw) !== null; }
 
-function isAuthed(){
-  try{ return sessionStorage.getItem(AUTH_KEY)==='ok' || localStorage.getItem(AUTH_KEY)==='ok'; }
-  catch(e){ return false; }
-}
-function setAuthed(remember){
+/** The signed-in role, or null when not properly signed in.
+ *  Fails closed: an auth flag with no valid role counts as signed out, so a
+ *  stale flag from an older build can never be mistaken for owner access. */
+function currentRole(){
   try{
-    (remember ? localStorage : sessionStorage).setItem(AUTH_KEY,'ok');
+    const a = sessionStorage.getItem(AUTH_KEY)==='ok' || localStorage.getItem(AUTH_KEY)==='ok';
+    if(!a) return null;
+    const r = sessionStorage.getItem(ROLE_KEY) || localStorage.getItem(ROLE_KEY);
+    return (r === 'owner' || r === 'guest') ? r : null;
+  }catch(e){ return null; }
+}
+function isAuthed(){ return currentRole() !== null; }
+function setAuthed(remember, role){
+  try{
+    const store = remember ? localStorage : sessionStorage;
+    store.setItem(AUTH_KEY, 'ok');
+    store.setItem(ROLE_KEY, role);
   }catch(e){}
 }
 function clearAuthed(){
-  try{ sessionStorage.removeItem(AUTH_KEY); localStorage.removeItem(AUTH_KEY); }catch(e){}
+  try{
+    [sessionStorage, localStorage].forEach(function(s){
+      s.removeItem(AUTH_KEY); s.removeItem(ROLE_KEY);
+    });
+  }catch(e){}
 }
 function lockApp(){
   clearAuthed();
+  state.role = null;
   document.documentElement.classList.add('locked');
   const pw=document.getElementById('gatePw');
   if(pw){ pw.value=''; pw.classList.remove('bad'); }
@@ -2609,13 +2687,14 @@ function wireGate(){
     ev.preventDefault();
     const val = pw.value;
     if(!val){ err.textContent='Please enter the password.'; pw.focus(); return; }
-    if(passwordOk(val)){
+    const role = roleForPassword(val);
+    if(role){
       err.textContent='';
       pw.classList.remove('bad');
-      setAuthed(document.getElementById('gateRemember').checked);
+      setAuthed(document.getElementById('gateRemember').checked, role);
       document.documentElement.classList.remove('locked');
       startApp();
-      toast('Welcome back.');
+      toast(role === 'owner' ? 'Signed in as owner — full access.' : 'Signed in as guest — view only.');
     }else{
       err.textContent='Incorrect password. Try again.';
       pw.classList.add('bad');
@@ -2642,8 +2721,45 @@ function wireGate(){
 
 let appReady = false;
 function startApp(){
+  state.role = currentRole() || 'guest';
   if(!appReady){ init(); appReady = true; }
   else { render(); }
+  applyRole();
+}
+
+/* ================================================================
+   ROLE GATING
+   Hiding a control is presentation; every mutating action ALSO
+   checks canEdit() itself, so a guest cannot reach one by any path
+   (menu, keyboard, drag-and-drop, or a stale DOM).
+   ================================================================ */
+function applyRole(){
+  const owner = canEdit();
+
+  document.body.classList.toggle('role-guest', !owner);
+  document.body.classList.toggle('role-owner', owner);
+
+  // controls a guest must not see
+  ['btnAdd','btnImportTop'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.style.display = owner ? '' : 'none';
+  });
+  const impTab = document.querySelector('#viewTabs button[data-v="import"]');
+  if(impTab) impTab.style.display = owner ? '' : 'none';
+  ['importJson','clearDone','reset'].forEach(function(act){
+    const b = document.querySelector('#menu button[data-act="'+act+'"]');
+    if(b) b.style.display = owner ? '' : 'none';
+  });
+
+  // visible reminder of the current role
+  const badge = document.getElementById('roleBadge');
+  if(badge) badge.style.display = owner ? 'none' : '';
+
+  // a guest must never be left sitting on the import view
+  if(!owner && state.view === 'import'){ state.view = 'month'; }
+
+  // close any editor that was open when the role changed
+  if(!owner){ closeModals(); }
 }
 
 
@@ -2673,7 +2789,10 @@ function init(){
   document.getElementById('btnNext').onclick = ()=>navigate(1);
   document.getElementById('btnToday').onclick = goToday;
   document.getElementById('btnAdd').onclick = ()=>openEditor(null);
-  document.getElementById('btnImportTop').onclick = ()=>{ state.view='import'; render(); };
+  document.getElementById('btnImportTop').onclick = ()=>{
+    if(!canEdit()){ toast('View-only access — you cannot import notices.'); return; }
+    state.view='import'; render();
+  };
   document.getElementById('btnSidebar').onclick = ()=>document.getElementById('sidebar').classList.toggle('collapsed');
   document.getElementById('bannerClose').onclick = ()=>{ state.sample=false; save(); render(); };
 
@@ -2737,13 +2856,19 @@ function init(){
     const a = b.dataset.act;
     if(a==='exportIcs') exportICS();
     if(a==='exportJson') exportJSON();
-    if(a==='importJson') importJSON();
     if(a==='print') window.print();
+    if(a==='lock') lockApp();
+    // everything below changes data — owners only
+    if(a==='importJson'){
+      if(!canEdit()){ toast('View-only access — you cannot import data.'); return; }
+      importJSON();
+    }
     if(a==='clearDone'){
+      if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
       state.events.forEach(e=>e.done=false); save(); render(); toast('Completed marks cleared.');
     }
-    if(a==='lock') lockApp();
     if(a==='reset'){
+      if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
       if(confirm('Reset the calendar back to the original October 2026 notice from SJKC Phei Shin? Any events you have added will be lost.')){
         state.events = BASE_EVENTS.map(e=>({...e}));
         state.sources = [{name:SOURCE_DOC+' (school notice)', date:SOURCE_DATE, n:BASE_EVENTS.length, kind:'notice'}];
@@ -2759,6 +2884,7 @@ function init(){
     if(openEl){ ev.stopPropagation(); openEventById(openEl.dataset.open); return; }
     const doneEl = ev.target.closest('[data-done]');
     if(doneEl){
+      if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
       const e = state.events.find(x=>x.id===doneEl.dataset.done);
       if(e){ e.done = !e.done; save(); render(); }
       return;
@@ -2767,6 +2893,7 @@ function init(){
     if(moreEl){ openDay(moreEl.dataset.day); return; }
     const slot = ev.target.closest('[data-slot]');
     if(slot){
+      if(!canEdit()){ toast('View-only access — you cannot add events.'); return; }
       const [day,h] = slot.dataset.slot.split('|');
       openEditor(null, day);
       document.getElementById('fAllDay').checked = false;
@@ -2778,7 +2905,8 @@ function init(){
     const cell = ev.target.closest('[data-cell]');
     if(cell){
       const day = cell.dataset.cell;
-      if(ev.target.closest('.daynum')) openDay(day);
+      // a guest clicking a day gets the read-only day list, never the editor
+      if(ev.target.closest('.daynum') || !canEdit()) openDay(day);
       else openEditor(null, day);
     }
   });
@@ -2811,6 +2939,7 @@ function init(){
   document.getElementById('edDelete').onclick = deleteEditor;
   document.getElementById('fAllDay').addEventListener('change', toggleTimeFields);
   document.getElementById('dayAdd').onclick = ev=>{
+    if(!canEdit()){ toast('View-only access — you cannot add events.'); return; }
     const day = ev.target.dataset.day;
     closeModals();
     openEditor(null, day);
@@ -2831,7 +2960,7 @@ function init(){
       if(ev.key==='m' || ev.key==='M'){ state.view='month'; render(); }
       if(ev.key==='w' || ev.key==='W'){ state.view='week'; render(); }
       if(ev.key==='a' || ev.key==='A'){ state.view='agenda'; render(); }
-      if(ev.key==='i' || ev.key==='I'){ state.view='import'; render(); }
+      if((ev.key==='i' || ev.key==='I') && canEdit()){ state.view='import'; render(); }
     }
   });
 }
