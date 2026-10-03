@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light" class="locked"><head>
+<html lang="en" data-theme="light">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kids School Event Calendar</title>
@@ -743,12 +744,25 @@ html.locked .app{display:none}
   display:block;font-size:11.5px;font-weight:700;color:var(--text-dim);
   text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;
 }
+.gate-opt{
+  font-weight:600;font-size:10px;letter-spacing:.4px;
+  color:var(--accent-text);background:var(--accent-soft);
+  border-radius:999px;padding:1px 7px;margin-left:5px;
+  text-transform:none;
+}
 .gate-input{position:relative;display:flex;align-items:center}
 .gate-input input{
   width:100%;padding:12px 46px 12px 14px;font-size:16px;letter-spacing:3px;
   border:1px solid var(--border);border-radius:9px;background:var(--panel-soft);
   outline:none;transition:border-color .14s,box-shadow .14s;
 }
+#gateEmail{
+  width:100%;padding:12px 14px;font-size:15px;letter-spacing:normal;
+  border:1px solid var(--border);border-radius:9px;background:var(--panel-soft);
+  outline:none;transition:border-color .14s,box-shadow .14s;
+}
+#gateEmail:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background:var(--panel)}
+#gateEmail.bad{border-color:var(--danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 18%,transparent)}
 .gate-input input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);background:var(--panel)}
 .gate-input input.bad,
 .gate-input input.bad:focus{
@@ -800,6 +814,43 @@ body.role-guest .ev{cursor:default}
   background:var(--accent-soft);border-radius:8px;padding:8px 11px;margin-top:2px;
 }
 
+/* ---------- Sync badge ---------- */
+.sync-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 12px;border-radius:999px;font-size:11.5px;font-weight:700;
+  white-space:nowrap;border:1.5px solid transparent;
+}
+.sync-badge.sync-ok{background:#E4F3D5;color:#3A7420;border-color:#B6DD93}
+.sync-badge.sync-busy{background:var(--accent-soft);color:var(--accent-text);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+.sync-badge.sync-err{background:#FDE7C7;color:#8A4B00;border-color:#E8B45C}
+.sync-badge.sync-off{background:var(--panel-soft);color:var(--text-faint);border-color:var(--border)}
+[data-theme="dark"] .sync-badge.sync-ok{background:#26401F;color:#A8E070;border-color:#3E6B2C}
+[data-theme="dark"] .sync-badge.sync-err{background:#3A2A12;color:#FFCF8A;border-color:#5C4318}
+.sync-badge.sync-busy::before{
+  content:"";width:9px;height:9px;border-radius:50%;
+  border:2px solid currentColor;border-top-color:transparent;
+  animation:spin .7s linear infinite;
+}
+
+.who-sum{
+  font-size:13px;color:var(--text-dim);background:var(--panel-soft);
+  border:1px solid var(--border-soft);border-radius:8px;padding:10px 13px;margin-bottom:12px;
+}
+.who-sum b{color:var(--text)}
+/* connection report checklist */
+.chk{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border-soft)}
+.chk:last-of-type{border-bottom:none}
+.chk-ic{
+  flex:0 0 21px;width:21px;height:21px;border-radius:50%;
+  display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;margin-top:1px;
+}
+.chk.ok .chk-ic{background:#1e8e3e}
+.chk.bad .chk-ic{background:var(--danger)}
+.chk.wait .chk-ic{background:var(--text-faint)}
+.chk div{min-width:0}
+.chk b{display:block;font-size:13px}
+.chk span{display:block;font-size:12px;color:var(--text-dim);margin-top:2px;line-height:1.5}
+
 /* responsive */
 .sb-toggle{display:none}
 @media (max-width:900px){
@@ -827,13 +878,20 @@ body.role-guest .ev{cursor:default}
       <span class="pik pik-flower" style="--s:52px;--body:#E8453C;--leafc:#F2C230;--stalkc:#5DA82F;--petalc:#FFF6E2"><i></i></span>
     </div>
     <h1>School Event Calendar</h1>
-    <p class="gate-sub">SJKC Phei Shin · Private</p>
+    <p class="gate-sub">SJKC Phei Shin &middot; Private</p>
+
+    <div class="gate-field">
+      <label for="gateEmail">Your email <span class="gate-opt">guests only</span></label>
+      <input type="email" id="gateEmail" autocomplete="email" spellcheck="false"
+             placeholder="you@example.com" aria-label="Your email address">
+    </div>
 
     <div class="gate-field">
       <label for="gatePw">Password</label>
       <div class="gate-input">
-        <input type="password" id="gatePw" inputmode="numeric" autocomplete="current-password" placeholder="••••••" aria-label="Password" required="">
-        <button type="button" class="gate-eye" id="gateEye" title="Show password" aria-label="Show password">👁</button>
+        <input type="password" id="gatePw" inputmode="numeric" autocomplete="current-password"
+               placeholder="&bull;&bull;&bull;&bull;&bull;&bull;" aria-label="Password" required>
+        <button type="button" class="gate-eye" id="gateEye" title="Show password" aria-label="Show password">&#128065;</button>
       </div>
     </div>
 
@@ -842,7 +900,7 @@ body.role-guest .ev{cursor:default}
     <div class="gate-err" id="gateErr" role="alert"></div>
     <button type="submit" class="btn-primary gate-btn" id="gateBtn">Unlock calendar</button>
 
-    <p class="gate-foot">Events are stored only in this browser.<br>Nobody else can see them from another device.</p>
+    <p class="gate-foot" id="gateFoot">Events are stored only in this browser.<br>Nobody else can see them from another device.</p>
   </form>
 
   <div class="gate-pikmin" aria-hidden="true">
@@ -865,15 +923,15 @@ body.role-guest .ev{cursor:default}
         </div>
         <div class="brand-txt">
           <b>School Event Calendar</b>
-          <span id="brandSub">Loading…</span>
+          <span id="brandSub">Loading&hellip;</span>
         </div>
       </div>
       <button class="btn-add" id="btnAdd">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         Add Event
       </button>
       <button class="btn-add btn-import" id="btnImportTop" style="margin-top:8px;background:var(--panel-soft);color:var(--text);border:1px solid var(--border);box-shadow:none">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
         Import School Notice
       </button>
     </div>
@@ -883,8 +941,8 @@ body.role-guest .ev{cursor:default}
         <div class="mini-head">
           <b id="miniTitle">&nbsp;</b>
           <div class="mini-nav">
-            <button id="miniPrev" title="Previous month">‹</button>
-            <button id="miniNext" title="Next month">›</button>
+            <button id="miniPrev" title="Previous month">&#8249;</button>
+            <button id="miniNext" title="Next month">&#8250;</button>
           </div>
         </div>
         <div class="mini-grid" id="miniGrid"></div>
@@ -931,53 +989,59 @@ body.role-guest .ev{cursor:default}
   <div class="main">
     <div class="toolbar">
       <button class="icon-btn sb-toggle" id="btnSidebar" title="Toggle sidebar">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
       <button class="btn-ghost" id="btnToday">Today</button>
       <div class="mini-nav">
-        <button class="icon-btn" id="btnPrev" title="Previous">‹</button>
-        <button class="icon-btn" id="btnNext" title="Next">›</button>
+        <button class="icon-btn" id="btnPrev" title="Previous">&#8249;</button>
+        <button class="icon-btn" id="btnNext" title="Next">&#8250;</button>
       </div>
       <div class="tb-title" id="tbTitle">&nbsp;</div>
 
       <div class="spacer"></div>
 
-      <span class="role-badge" id="roleBadge" style="display:none" title="You signed in with view-only access — events cannot be changed">👁&nbsp; View only</span>
+      <span class="role-badge" id="roleBadge" style="display:none"
+            title="You signed in with view-only access — events cannot be changed">&#128065;&nbsp; View only</span>
+      <span class="sync-badge sync-off" id="syncBadge" title="Google Sheets sync">&#9723;&nbsp; Not synced</span>
 
       <div class="search">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="color:var(--text-faint);flex:0 0 auto"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
-        <input type="text" id="searchBox" placeholder="Search events…">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="color:var(--text-faint);flex:0 0 auto"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="text" id="searchBox" placeholder="Search events&hellip;">
       </div>
 
       <div class="tabs" id="viewTabs">
         <button data-v="month">Month</button>
         <button data-v="week">Week</button>
         <button data-v="agenda">Agenda</button>
-        <button data-v="import">📤 Import</button>
+        <button data-v="import">&#128228; Import</button>
       </div>
 
       <div class="menu-wrap">
         <button class="icon-btn" id="btnMenu" title="More">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"></circle><circle cx="12" cy="12" r="2"></circle><circle cx="12" cy="19" r="2"></circle></svg>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
         </button>
         <div class="menu" id="menu">
-          <button data-act="exportIcs">📅&nbsp; Export to Google Calendar (.ics)</button>
-          <button data-act="exportJson">💾&nbsp; Export data (.json)</button>
-          <button data-act="importJson">📤&nbsp; Import data (.json)</button>
+          <button data-act="syncNow">&#8635;&nbsp; Sync with Google Sheet</button>
+          <button data-act="syncTest">&#128268;&nbsp; Test the Sheet connection</button>
+          <button data-act="whoLooked">&#128065;&nbsp; Who has been looking?</button>
           <hr>
-          <button data-act="print">🖨&nbsp; Print / Save as PDF</button>
-          <button data-act="clearDone">✓&nbsp; Clear completed marks</button>
+          <button data-act="exportIcs">&#128197;&nbsp; Export to Google Calendar (.ics)</button>
+          <button data-act="exportJson">&#128190;&nbsp; Export data (.json)</button>
+          <button data-act="importJson">&#128228;&nbsp; Import data (.json)</button>
           <hr>
-          <button data-act="lock">🔒&nbsp; Lock this device</button>
-          <button data-act="reset" style="color:var(--danger)">↻&nbsp; Reset to the October 2026 notice</button>
+          <button data-act="print">&#128424;&nbsp; Print / Save as PDF</button>
+          <button data-act="clearDone">&#10003;&nbsp; Clear completed marks</button>
+          <hr>
+          <button data-act="lock">&#128274;&nbsp; Lock this device</button>
+          <button data-act="reset" style="color:var(--danger)">&#8635;&nbsp; Reset to the October 2026 notice</button>
         </div>
       </div>
     </div>
 
     <div class="banner" id="banner" style="display:none">
-      <span>⚠️</span>
-      <div><b>Sample data shown.</b> These are placeholder events so you can see how the calendar works — they are <b>not</b> your school's real dates.</div>
-      <button id="bannerClose" title="Dismiss">×</button>
+      <span>&#9888;&#65039;</span>
+      <div><b>Sample data shown.</b> These are placeholder events so you can see how the calendar works &mdash; they are <b>not</b> your school's real dates.</div>
+      <button id="bannerClose" title="Dismiss">&times;</button>
     </div>
 
     <div class="viewport" id="viewport"></div>
@@ -989,7 +1053,7 @@ body.role-guest .ev{cursor:default}
   <div class="modal">
     <div class="m-head">
       <h2 id="edTitle">New Event</h2>
-      <button class="icon-btn" data-close="">×</button>
+      <button class="icon-btn" data-close>&times;</button>
     </div>
     <div class="m-body">
       <div class="field">
@@ -1029,15 +1093,15 @@ body.role-guest .ev{cursor:default}
       </div>
       <div class="field">
         <label>Description</label>
-        <textarea id="fDesc" placeholder="Details from the school notice…"></textarea>
+        <textarea id="fDesc" placeholder="Details from the school notice&hellip;"></textarea>
       </div>
       <div class="hint" id="edSource" style="display:none"></div>
-      <div class="ed-readonly" id="edReadonly" style="display:none">👁 View-only access — this event cannot be changed.</div>
+      <div class="ed-readonly" id="edReadonly" style="display:none">&#128065; View-only access &mdash; this event cannot be changed.</div>
     </div>
     <div class="m-foot">
       <button class="btn-danger" id="edDelete" style="display:none">Delete</button>
       <div class="spacer"></div>
-      <button class="btn-plain" data-close="">Cancel</button>
+      <button class="btn-plain" data-close>Cancel</button>
       <button class="btn-primary" id="edSave">Save Event</button>
     </div>
   </div>
@@ -1048,13 +1112,43 @@ body.role-guest .ev{cursor:default}
   <div class="modal wide">
     <div class="m-head">
       <h2 id="dayTitle">Day</h2>
-      <button class="icon-btn" data-close="">×</button>
+      <button class="icon-btn" data-close>&times;</button>
     </div>
     <div class="m-body"><div class="day-list" id="dayList"></div></div>
     <div class="m-foot">
-      <button class="btn-plain" data-close="">Close</button>
+      <button class="btn-plain" data-close>Close</button>
       <div class="spacer"></div>
       <button class="btn-primary" id="dayAdd">Add event on this day</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHEET CONNECTION REPORT ============ -->
+<div class="overlay" id="ovCheck">
+  <div class="modal">
+    <div class="m-head">
+      <h2>Sheet connection</h2>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="m-body"><div id="checkBody" class="day-list"></div></div>
+    <div class="m-foot">
+      <div class="spacer"></div>
+      <button class="btn-plain" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ WHO HAS BEEN LOOKING ============ -->
+<div class="overlay" id="ovWho">
+  <div class="modal wide">
+    <div class="m-head">
+      <h2>Who has been looking</h2>
+      <button class="icon-btn" data-close>&times;</button>
+    </div>
+    <div class="m-body"><div id="whoList" class="day-list"></div></div>
+    <div class="m-foot">
+      <span class="hint" style="margin:0;flex:1">Recorded in the <b>Log</b> tab of your Google Sheet.</span>
+      <button class="btn-plain" data-close>Close</button>
     </div>
   </div>
 </div>
@@ -1147,7 +1241,46 @@ const CATEGORIES = {
   deadline:    {label:'Deadline / Payment',  color:'#8A7A63'}   // Rock Pikmin
 };
 
-const STORE_KEY = 'school-events-calendar-v1';const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const STORE_KEY = 'school-events-calendar-v1';
+
+/* ================================================================
+   GOOGLE SHEETS SYNC
+   ----------------------------------------------------------------
+   Google Sheets is the SOURCE OF TRUTH. On every load the app pulls
+   from the Sheet and replaces what it has; the local copy is only an
+   offline cache so the calendar still opens without internet.
+
+   Fill these two in from SETUP.md step 6. Leave url empty to run the
+   app standalone with no sync at all.
+   ================================================================ */
+const SYNC = {
+  url:   'https://script.google.com/macros/s/AKfycbwz9YvXx_C6rx1yPrf9OZHfEDKkn_EF4BQ3qYm41-dEPO0Tui4f3GQU3MSnrR28RDuczw/exec',
+  token: 'ngkaixuen_ngyeeching',
+  timeoutMs: 12000
+};
+function syncConfigured(){ return !!(SYNC.url && SYNC.token); }
+
+/* ================================================================
+   GUEST EMAIL ACCESS
+   ----------------------------------------------------------------
+   Guests sign in with their email address plus the guest password.
+   The address is sent to the Sheet and recorded in its "Log" tab, so
+   you can see who has been opening the calendar.
+
+   To restrict guests to specific people, list their addresses here.
+   While this list is EMPTY, any valid email is accepted — the address
+   is still recorded, but it is self-declared and unverified.
+   ================================================================ */
+const GUEST_EMAILS = [
+  // 'grandma@example.com',
+  // 'uncle.tan@example.com'
+];
+function guestEmailAllowed(email){
+  if(!GUEST_EMAILS.length) return true;                  // open mode
+  return GUEST_EMAILS.indexOf(String(email||'').trim().toLowerCase()) !== -1;
+}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function validEmail(e){ return EMAIL_RE.test(String(e||'').trim()); }const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW_LONG  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
@@ -1202,6 +1335,8 @@ const state = {
   sample: SAMPLE_MODE,
   editingId: null,
   role: null,           // 'owner' | 'guest' | null — set at sign-in
+  who: '',              // the guest's email address ('' for the owner)
+  sync: { state:'off', at:null, msg:'', rev:0 },   // Google Sheets status
   sources: [],          // record of every notice ever imported
   imp: null             // live import session (not persisted)
 };
@@ -1682,22 +1817,28 @@ function saveEditor(){
   };
   if(data.endDate && data.endDate < data.date) data.endDate = data.date;
 
+  let saved = null;
   if(state.editingId){
     const i = state.events.findIndex(e=>e.id===state.editingId);
-    if(i>-1) state.events[i] = {...state.events[i], ...data};
+    if(i>-1){ state.events[i] = {...state.events[i], ...data}; saved = state.events[i]; }
   }else{
-    state.events.push({id:'e'+Date.now()+Math.random().toString(36).slice(2,6), ...data});
+    saved = {id:'e'+Date.now()+Math.random().toString(36).slice(2,6), ...data};
+    state.events.push(saved);
   }
   state.sample = false;
   save(); closeModals(); render();
+  if(saved) syncUpsert([saved]);
   toast(state.editingId ? 'Event updated.' : 'Event added.');
 }
 function deleteEditor(){
   if(!canEdit()){ toast('View-only access — you cannot delete events.'); return; }
   if(!state.editingId) return;
   if(!confirm('Delete this event? This cannot be undone.')) return;
-  state.events = state.events.filter(e=>e.id!==state.editingId);
-  save(); closeModals(); render(); toast('Event deleted.');
+  const gone = state.editingId;
+  state.events = state.events.filter(e=>e.id!==gone);
+  save(); closeModals(); render();
+  syncRemove([gone]);
+  toast('Event deleted.');
 }
 function openDay(dayStr){
   const d = parseYmd(dayStr);
@@ -1817,6 +1958,7 @@ function readJsonFile(f){
       if(Array.isArray(data.sources)) state.sources = data.sources;
       state.sample = false;
       save(); render();
+      syncReplaceAll(state.events);
       toast(`Imported ${state.events.length} events.`);
     }catch(err){ toast('Could not read that file — expected JSON.'); }
   };
@@ -2315,6 +2457,7 @@ function commitImport(){
   state.sources = state.sources.slice(0,20);
   state.sample = false;
   save();
+  syncUpsert(picked.map(function(r){ return state.events.find(function(e){ return e.date===r.date && e.title===r.title.trim(); }); }).filter(Boolean));
   const msg = [added?`${added} added`:'', merged?`${merged} updated`:'', 'recorded in Import history'].filter(Boolean).join(', ');
   toast(msg + '.');
   state.imp = null;
@@ -2551,6 +2694,336 @@ function goToday(){
 }
 
 /* ================================================================
+   SYNC ENGINE
+   ----------------------------------------------------------------
+   Reads go through JSONP (a <script> tag) because Apps Script does
+   not answer a CORS preflight. Writes go through fetch() with a
+   text/plain body — a "simple request", so again no preflight.
+
+   Nothing here trusts a write: after every push the app re-reads the
+   revision from the Sheet and compares. A write that silently failed
+   is reported as failed.
+   ================================================================ */
+let _jsonpSeq = 0;
+function jsonpGet(params){
+  return new Promise(function(resolve, reject){
+    if(!syncConfigured()){ reject(new Error('Sync is not set up.')); return; }
+    const name = '__syncCb' + (++_jsonpSeq) + '_' + Date.now();
+    const qs = Object.keys(params).map(function(k){
+      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+    const url = SYNC.url + (SYNC.url.indexOf('?') > -1 ? '&' : '?') + qs +
+                '&token=' + encodeURIComponent(SYNC.token) +
+                '&who=' + encodeURIComponent(state.who || '') +
+                '&role=' + encodeURIComponent(state.role || '') +
+                '&callback=' + name;
+    const s = document.createElement('script');
+    let done = false;
+    const timer = setTimeout(function(){
+      if(done) return;
+      done = true;
+      cleanup();
+      reject(new Error('The Sheet did not answer in time.'));
+    }, SYNC.timeoutMs);
+    function cleanup(){
+      clearTimeout(timer);
+      try{ delete window[name]; }catch(e){ window[name] = undefined; }
+      if(s.parentNode) s.parentNode.removeChild(s);
+    }
+    window[name] = function(data){
+      if(done) return;
+      done = true; cleanup(); resolve(data);
+    };
+    s.onerror = function(){
+      if(done) return;
+      done = true; cleanup();
+      reject(new Error('Could not reach the Sheet.'));
+    };
+    s.src = url;
+    document.body.appendChild(s);
+  });
+}
+
+async function syncPost(body){
+  if(!syncConfigured()) throw new Error('Sync is not set up.');
+  body.token = SYNC.token;
+  body.who  = state.who  || '';
+  body.role = state.role || '';
+  const ctl = ('AbortController' in window) ? new AbortController() : null;
+  const timer = setTimeout(function(){ if(ctl) ctl.abort(); }, SYNC.timeoutMs);
+  try{
+    const res = await fetch(SYNC.url, {
+      method: 'POST',
+      // text/plain keeps this a CORS "simple request" — no preflight,
+      // which Apps Script cannot answer.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+      redirect: 'follow',
+      signal: ctl ? ctl.signal : undefined
+    });
+    const text = await res.text();
+    let data;
+    try{ data = JSON.parse(text); }
+    catch(e){ throw new Error('The Sheet sent an unexpected reply.'); }
+    if(!data.ok) throw new Error(data.error || 'The Sheet refused the write.');
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ---- sync status ---- */
+function setSyncState(s, msg){
+  state.sync.state = s;
+  state.sync.msg = msg || '';
+  if(s === 'ok' || s === 'error' || s === 'offline') state.sync.at = new Date();
+  renderSyncBadge();
+}
+function renderSyncBadge(){
+  const el = document.getElementById('syncBadge');
+  if(!el) return;
+  if(!syncConfigured()){
+    el.className = 'sync-badge sync-off';
+    el.innerHTML = '&#9723;&nbsp; Not synced';
+    el.title = 'No Google Sheet connected yet — see SETUP.md';
+    return;
+  }
+  const s = state.sync;
+  if(s.state === 'syncing'){
+    el.className = 'sync-badge sync-busy';
+    el.innerHTML = '&#8635;&nbsp; Syncing&hellip;';
+    el.title = 'Talking to your Google Sheet';
+    return;
+  }
+  if(s.state === 'error' || s.state === 'offline'){
+    el.className = 'sync-badge sync-err';
+    el.innerHTML = '&#9888;&nbsp; Offline copy';
+    el.title = (s.msg || 'Could not reach the Sheet') + ' — showing the last copy saved in this browser.';
+    return;
+  }
+  if(s.state === 'ok'){
+    const t = s.at ? s.at.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    el.className = 'sync-badge sync-ok';
+    el.innerHTML = '&#10003;&nbsp; Synced ' + t;
+    el.title = 'Up to date with your Google Sheet' + (s.msg ? ' — ' + s.msg : '');
+    return;
+  }
+  el.className = 'sync-badge sync-off';
+  el.innerHTML = '&#9723;&nbsp; Not synced';
+}
+
+/* ---- pull: the Sheet always wins ---- */
+async function syncPull(opts){
+  opts = opts || {};
+  if(!syncConfigured()){ setSyncState('off'); return false; }
+  setSyncState('syncing');
+  try{
+    const data = await jsonpGet({ action: 'load' });
+    if(!data || !data.ok) throw new Error((data && data.error) || 'The Sheet refused the read.');
+
+    if(!data.events || !data.events.length){
+      // Empty Sheet. Seed it from whatever the app currently holds so the
+      // first run is not a blank calendar.
+      if(canEdit() && state.events.length){
+        await syncReplaceAll(state.events);
+        setSyncState('ok', 'seeded the Sheet');
+      }else{
+        setSyncState('ok', 'the Sheet is empty');
+      }
+      return true;
+    }
+
+    const incoming = data.events.map(function(e){
+      return {
+        id: e.id, title: e.title, cat: CATEGORIES[e.cat] ? e.cat : 'school',
+        date: e.date, endDate: e.endDate || '', allDay: !!e.allDay,
+        start: e.start || '', end: e.end || '', loc: e.loc || '',
+        desc: e.desc || '', src: e.src || '', done: !!e.done
+      };
+    });
+    state.events = incoming;
+    state.sync.rev = data.rev || 0;
+    state.sample = false;
+    save();
+    if(!opts.silent) render();
+    setSyncState('ok', incoming.length + ' events');
+    return true;
+  }catch(err){
+    // Fall back to the cached copy so the calendar still opens offline.
+    setSyncState('offline', err.message || String(err));
+    return false;
+  }
+}
+
+/* ---- push helpers (owner only) ---- */
+async function syncUpsert(events){
+  if(!syncConfigured() || !canEdit()) return;
+  setSyncState('syncing');
+  try{
+    const res = await syncPost({ action: 'upsert', events: events });
+    state.sync.rev = res.rev || state.sync.rev;
+    setSyncState('ok', res.count + ' events');
+  }catch(err){
+    setSyncState('error', err.message || String(err));
+    toast('Saved here, but not to the Sheet: ' + (err.message || err));
+  }
+}
+async function syncRemove(ids){
+  if(!syncConfigured() || !canEdit()) return;
+  setSyncState('syncing');
+  try{
+    const res = await syncPost({ action: 'remove', ids: ids });
+    state.sync.rev = res.rev || state.sync.rev;
+    setSyncState('ok', res.count + ' events');
+  }catch(err){
+    setSyncState('error', err.message || String(err));
+    toast('Deleted here, but not from the Sheet: ' + (err.message || err));
+  }
+}
+async function syncReplaceAll(events){
+  if(!syncConfigured() || !canEdit()) return;
+  setSyncState('syncing');
+  try{
+    const res = await syncPost({ action: 'replaceAll', events: events });
+    state.sync.rev = res.rev || state.sync.rev;
+    setSyncState('ok', res.count + ' events');
+  }catch(err){
+    setSyncState('error', err.message || String(err));
+    toast('Saved here, but not to the Sheet: ' + (err.message || err));
+  }
+}
+/** Health probe — proves the deployment is live and reading real data. */
+async function syncPing(){
+  try{
+    const d = await jsonpGet({ action: 'ping' });
+    return d;
+  }catch(err){ return { ok:false, error: err.message || String(err) }; }
+}
+
+/** Full connection report — tells you exactly which step is not done yet. */
+async function showConnectionReport(){
+  const box = document.getElementById('checkBody');
+  document.getElementById('ovCheck').classList.add('open');
+  box.innerHTML = '<div class="day-empty">Checking&hellip;</div>';
+
+  const line = (ok, label, detail) =>
+    '<div class="chk ' + (ok === true ? 'ok' : ok === false ? 'bad' : 'wait') + '">' +
+      '<span class="chk-ic">' + (ok === true ? '&#10003;' : ok === false ? '!' : '&hellip;') + '</span>' +
+      '<div><b>' + label + '</b>' + (detail ? '<span>' + detail + '</span>' : '') + '</div>' +
+    '</div>';
+
+  if(!syncConfigured()){
+    box.innerHTML = line(false, 'No Sheet connected',
+      'The SYNC block near the top of index.html has an empty url or token.');
+    return;
+  }
+
+  // 1. can we reach it at all?
+  const p = await syncPing();
+  if(!p || !p.ok){
+    const msg = String((p && p.error) || 'unknown error');
+    const looksLocked = /sign|auth|401|403/i.test(msg);
+    box.innerHTML =
+      line(false, 'Cannot reach the Sheet', esc(msg)) +
+      '<div class="hint">Most likely your Apps Script deployment is not shared publicly. ' +
+      'In the script editor: <b>Deploy &rarr; Manage deployments &rarr; pencil icon &rarr; ' +
+      'Who has access: Anyone &rarr; Deploy</b>.' +
+      (looksLocked ? '' : ' If that is already set, check the token matches on both sides.') +
+      '</div>';
+    return;
+  }
+
+  // 2. reachable and the token is good
+  let html = line(true, 'Reached the Sheet', 'Named &ldquo;' + esc(p.sheet || '') + '&rdquo;');
+  html += line(true, 'Token accepted', 'The token in index.html matches the one in the script');
+
+  // 3. is the DEPLOYED SCRIPT the current one?
+  let upToDate = false, why = '';
+  try{
+    const w = await jsonpGet({ action: 'who', limit: 1 });
+    upToDate = !!(w && w.ok);
+    if(!upToDate) why = String((w && w.error) || '');
+  }catch(e){ why = e.message || String(e); }
+
+  if(upToDate){
+    html += line(true, 'Script is up to date', 'The access log is available');
+  }else{
+    html += line(false, 'Script is out of date',
+      'The deployed version does not support the access log' + (why ? ' (' + esc(why) + ')' : ''));
+    html += '<div class="hint"><b>Fix this:</b> in the Apps Script editor, select all the old code and ' +
+      'paste the current <code>google-apps-script.gs</code> over it (Ctrl+S). Then ' +
+      '<b>Deploy &rarr; Manage deployments &rarr; pencil icon &rarr; Version: New version &rarr; Deploy</b>.<br><br>' +
+      'Do <b>not</b> click &ldquo;New deployment&rdquo; — that makes a second address and the URL in ' +
+      'index.html would stop working.</div>';
+  }
+
+  // 4. what is actually in there
+  try{
+    const d = await jsonpGet({ action: 'load' });
+    const n = (d && d.events) ? d.events.length : 0;
+    html += n
+      ? line(true, n + ' event' + (n === 1 ? '' : 's') + ' in the Sheet', 'This is the master copy')
+      : line(null, 'The Sheet is empty',
+          'Open the app with the <b>owner</b> password and it will be filled from the calendar');
+  }catch(e){ /* the load check is a bonus, not essential */ }
+
+  box.innerHTML = html;
+}
+
+/** Read the Sheet's Log tab and show who has been opening the calendar. */
+async function showWhoLooked(){  const box = document.getElementById('whoList');
+  box.innerHTML = '<div class="day-empty">Reading the log&hellip;</div>';
+  document.getElementById('ovWho').classList.add('open');
+
+  if(!syncConfigured()){
+    box.innerHTML = '<div class="day-empty">No Google Sheet is connected yet, so nothing is recorded.</div>';
+    return;
+  }
+  let d;
+  try{ d = await jsonpGet({ action: 'who', limit: 100 }); }
+  catch(err){ d = { ok:false, error: err.message || String(err) }; }
+
+  if(!d || !d.ok){
+    box.innerHTML = '<div class="day-empty">Could not read the log: ' + esc((d && d.error) || 'unknown error') + '</div>';
+    return;
+  }
+  const entries = d.entries || [];
+  if(!entries.length){
+    box.innerHTML = pikCrew(3) + '<div class="day-empty">Nothing logged yet.</div>';
+    return;
+  }
+
+  const people = {};
+  entries.forEach(function(r){ if(r.who) people[r.who] = (people[r.who] || 0) + 1; });
+  const names = Object.keys(people);
+
+  const summary = '<div class="who-sum">' +
+      entries.length + ' visit' + (entries.length === 1 ? '' : 's') + ' recorded' +
+      (names.length ? ' &middot; ' + names.length + ' guest' + (names.length === 1 ? '' : 's') +
+        ': <b>' + names.map(esc).join(', ') + '</b>' : '') +
+    '</div>';
+
+  const rows = entries.map(function(r){
+    let when = r.at || '';
+    const t = r.at ? new Date(r.at) : null;
+    if(t && !isNaN(t.getTime())) when = t.toLocaleString();
+    return '<tr>' +
+      '<td class="t">' + esc(when) + '</td>' +
+      '<td>' + (r.who ? esc(r.who) : '<i style="color:var(--text-faint)">owner</i>') + '</td>' +
+      '<td>' + esc(r.role || '') + '</td>' +
+      '<td>' + esc(r.action || '') + '</td>' +
+    '</tr>';
+  }).join('');
+
+  box.innerHTML = summary +
+    '<div style="overflow-x:auto"><table class="rev"><thead><tr>' +
+    '<th style="width:190px">When</th><th>Who</th><th style="width:90px">Role</th>' +
+    '<th style="width:110px">Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="hint">The email is what the guest typed at sign-in, so it is reported rather than proven. ' +
+    'Add addresses to <code>GUEST_EMAILS</code> in index.html to allow only specific people.</div>';
+}
+
+/* ================================================================
    LOGIN GATE
    ----------------------------------------------------------------
    IMPORTANT — what this is and is not.
@@ -2576,6 +3049,7 @@ const AUTH_ROLES = {
 };
 const AUTH_KEY  = 'school-events-auth-v1';
 const ROLE_KEY  = 'school-events-role-v1';
+const WHO_KEY   = 'school-events-who-v1';   // the guest's email address
 
 /* Self-contained SHA-256 (hex). Written out rather than using
    crypto.subtle so it works identically on file://, localhost and
@@ -2652,30 +3126,50 @@ function currentRole(){
   }catch(e){ return null; }
 }
 function isAuthed(){ return currentRole() !== null; }
-function setAuthed(remember, role){
+/** Who is signed in — the guest's email, or '' for the owner. */
+function currentWho(){
+  try{
+    const r = sessionStorage.getItem(ROLE_KEY) || localStorage.getItem(ROLE_KEY);
+    if(r !== 'guest') return '';
+    return sessionStorage.getItem(WHO_KEY) || localStorage.getItem(WHO_KEY) || '';
+  }catch(e){ return ''; }
+}
+function setAuthed(remember, role, who){
   try{
     const store = remember ? localStorage : sessionStorage;
     store.setItem(AUTH_KEY, 'ok');
     store.setItem(ROLE_KEY, role);
+    if(who) store.setItem(WHO_KEY, who); else store.removeItem(WHO_KEY);
   }catch(e){}
 }
 function clearAuthed(){
   try{
     [sessionStorage, localStorage].forEach(function(s){
-      s.removeItem(AUTH_KEY); s.removeItem(ROLE_KEY);
+      s.removeItem(AUTH_KEY); s.removeItem(ROLE_KEY); s.removeItem(WHO_KEY);
     });
   }catch(e){}
 }
 function lockApp(){
   clearAuthed();
   state.role = null;
+  state.who  = '';
   document.documentElement.classList.add('locked');
   const pw=document.getElementById('gatePw');
   if(pw){ pw.value=''; pw.classList.remove('bad'); }
+  const em=document.getElementById('gateEmail');
+  if(em){ em.value=''; em.classList.remove('bad'); }
   const err=document.getElementById('gateErr'); if(err) err.textContent='';
   const rem=document.getElementById('gateRemember'); if(rem) rem.checked=false;
   setTimeout(()=>{ if(pw) pw.focus(); }, 40);
   toast('Calendar locked.');
+}
+/** The gate must tell the truth about where the data actually lives. */
+function renderGateFoot(){
+  const foot = document.getElementById('gateFoot');
+  if(!foot) return;
+  foot.innerHTML = syncConfigured()
+    ? 'Synced with your Google Sheet.<br>Sign in as the owner to add or change events.'
+    : 'Not connected to Google Sheets yet.<br>Events stay in this browser only &mdash; see SETUP.md.';
 }
 function wireGate(){
   const form=document.getElementById('gateForm');
@@ -2683,30 +3177,67 @@ function wireGate(){
   const err  = document.getElementById('gateErr');
   const card = document.querySelector('.gate-card');
 
+  renderGateFoot();
+
   form.addEventListener('submit', ev=>{
     ev.preventDefault();
     const val = pw.value;
+    const emailEl = document.getElementById('gateEmail');
+    const email = (emailEl.value || '').trim().toLowerCase();
+
     if(!val){ err.textContent='Please enter the password.'; pw.focus(); return; }
+
     const role = roleForPassword(val);
-    if(role){
-      err.textContent='';
-      pw.classList.remove('bad');
-      setAuthed(document.getElementById('gateRemember').checked, role);
-      document.documentElement.classList.remove('locked');
-      startApp();
-      toast(role === 'owner' ? 'Signed in as owner — full access.' : 'Signed in as guest — view only.');
-    }else{
+
+    if(!role){
       err.textContent='Incorrect password. Try again.';
       pw.classList.add('bad');
       card.classList.remove('shake');
       void card.offsetWidth;          // restart the animation
       card.classList.add('shake');
       pw.select();
+      return;
     }
+
+    // Guests must identify themselves. The owner does not.
+    if(role === 'guest'){
+      if(!email){
+        err.textContent='Please enter your email address.';
+        emailEl.classList.add('bad');
+        emailEl.focus();
+        return;
+      }
+      if(!validEmail(email)){
+        err.textContent='That does not look like an email address.';
+        emailEl.classList.add('bad');
+        emailEl.focus();
+        return;
+      }
+      if(!guestEmailAllowed(email)){
+        err.textContent='That email is not on the guest list.';
+        emailEl.classList.add('bad');
+        emailEl.focus();
+        return;
+      }
+    }
+
+    err.textContent='';
+    pw.classList.remove('bad');
+    emailEl.classList.remove('bad');
+    setAuthed(document.getElementById('gateRemember').checked, role, role === 'guest' ? email : '');
+    document.documentElement.classList.remove('locked');
+    startApp();
+    toast(role === 'owner'
+      ? 'Signed in as owner — full access.'
+      : 'Signed in as ' + email + ' — view only.');
   });
 
   pw.addEventListener('input', ()=>{
     if(err.textContent){ err.textContent=''; pw.classList.remove('bad'); }
+  });
+  document.getElementById('gateEmail').addEventListener('input', ()=>{
+    const el = document.getElementById('gateEmail');
+    if(el.classList.contains('bad')){ el.classList.remove('bad'); err.textContent=''; }
   });
 
   document.getElementById('gateEye').addEventListener('click', ()=>{
@@ -2722,9 +3253,15 @@ function wireGate(){
 let appReady = false;
 function startApp(){
   state.role = currentRole() || 'guest';
+  state.who  = currentWho();
   if(!appReady){ init(); appReady = true; }
   else { render(); }
   applyRole();
+  renderSyncBadge();
+  // Google Sheets is the source of truth: pull on every sign-in so both the
+  // owner and any guest see the same calendar. Falls back to the local copy
+  // if the Sheet cannot be reached.
+  syncPull();
 }
 
 /* ================================================================
@@ -2746,14 +3283,20 @@ function applyRole(){
   });
   const impTab = document.querySelector('#viewTabs button[data-v="import"]');
   if(impTab) impTab.style.display = owner ? '' : 'none';
-  ['importJson','clearDone','reset'].forEach(function(act){
+  ['importJson','clearDone','reset','whoLooked'].forEach(function(act){
     const b = document.querySelector('#menu button[data-act="'+act+'"]');
     if(b) b.style.display = owner ? '' : 'none';
   });
 
   // visible reminder of the current role
   const badge = document.getElementById('roleBadge');
-  if(badge) badge.style.display = owner ? 'none' : '';
+  if(badge){
+    badge.style.display = owner ? 'none' : '';
+    badge.title = owner
+      ? ''
+      : 'View-only access' + (state.who ? ' as ' + state.who : '') +
+        ' — events cannot be changed. Your email is recorded in the calendar\u2019s log.';
+  }
 
   // a guest must never be left sitting on the import view
   if(!owner && state.view === 'import'){ state.view = 'month'; }
@@ -2858,6 +3401,20 @@ function init(){
     if(a==='exportJson') exportJSON();
     if(a==='print') window.print();
     if(a==='lock') lockApp();
+    if(a==='syncNow'){
+      if(!syncConfigured()){ toast('No Google Sheet connected yet — see SETUP.md.'); return; }
+      syncPull().then(function(ok){
+        if(ok) toast('Synced from your Google Sheet.');
+      });
+    }
+    if(a==='whoLooked'){
+      if(!canEdit()){ toast('View-only access.'); return; }
+      showWhoLooked();
+    }
+    if(a==='syncTest'){
+      if(!syncConfigured()){ toast('No Google Sheet connected yet — see SETUP.md.'); return; }
+      showConnectionReport();
+    }
     // everything below changes data — owners only
     if(a==='importJson'){
       if(!canEdit()){ toast('View-only access — you cannot import data.'); return; }
@@ -2865,14 +3422,18 @@ function init(){
     }
     if(a==='clearDone'){
       if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
-      state.events.forEach(e=>e.done=false); save(); render(); toast('Completed marks cleared.');
+      state.events.forEach(e=>e.done=false); save(); render();
+      syncUpsert(state.events);
+      toast('Completed marks cleared.');
     }
     if(a==='reset'){
       if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
       if(confirm('Reset the calendar back to the original October 2026 notice from SJKC Phei Shin? Any events you have added will be lost.')){
         state.events = BASE_EVENTS.map(e=>({...e}));
         state.sources = [{name:SOURCE_DOC+' (school notice)', date:SOURCE_DATE, n:BASE_EVENTS.length, kind:'notice'}];
-        state.sample = SAMPLE_MODE; save(); render(); toast('Reset to the October 2026 notice.');
+        state.sample = SAMPLE_MODE; save(); render();
+        syncReplaceAll(state.events);
+        toast('Reset to the October 2026 notice.');
       }
     }
   });
@@ -2886,7 +3447,7 @@ function init(){
     if(doneEl){
       if(!canEdit()){ toast('View-only access — you cannot change events.'); return; }
       const e = state.events.find(x=>x.id===doneEl.dataset.done);
-      if(e){ e.done = !e.done; save(); render(); }
+      if(e){ e.done = !e.done; save(); render(); syncUpsert([e]); }
       return;
     }
     const moreEl = ev.target.closest('[data-day]');
@@ -2974,6 +3535,5 @@ if(isAuthed()){
   wireGate();
 }
 </script>
-
-
-</body></html>
+</body>
+</html>
