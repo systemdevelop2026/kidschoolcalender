@@ -1284,7 +1284,13 @@ const STORE_KEY = 'school-events-calendar-v1';
 const SYNC = {
   url:   'https://script.google.com/macros/s/AKfycbwz9YvXx_C6rx1yPrf9OZHfEDKkn_EF4BQ3qYm41-dEPO0Tui4f3GQU3MSnrR28RDuczw/exec',
   token: 'ngkaixuen_ngyeeching',
-  timeoutMs: 12000
+  // Apps Script is genuinely slow: a first ("cold") call has to boot a
+  // container and routinely takes 3-8s, and on mobile data it is worse.
+  // 12s was tight enough that a phone could time out on a connection that
+  // was working perfectly. Reads also retry (see syncPull), so this is the
+  // per-attempt budget, not the total.
+  timeoutMs: 20000,
+  retryMs:   1200
 };
 function syncConfigured(){ return !!(SYNC.url && SYNC.token); }
 
@@ -2790,6 +2796,10 @@ function jsonpGet(params){
       try{ delete window[name]; }catch(e){ window[name] = undefined; }
       if(s.parentNode) s.parentNode.removeChild(s);
     }
+    // A <script> tag that fails to execute still fires onerror, but a slow
+    // one fires nothing at all. Both are handled: onerror rejects at once,
+    // the timer rejects eventually. Either way the promise always settles,
+    // so a pending request can never leave the badge stuck on "Syncing…".
     window[name] = function(data){
       if(done) return;
       done = true; cleanup(); resolve(data);
@@ -2802,6 +2812,22 @@ function jsonpGet(params){
     s.src = url;
     document.body.appendChild(s);
   });
+}
+
+/** Reads retry once. The overwhelmingly common cause of a failed read is a
+ *  cold Apps Script container or a brief mobile-network stall — both of
+ *  which succeed on the second attempt. Retrying hides that class of blip
+ *  from the user entirely instead of showing them "Offline copy".
+ *  Writes never retry here; they are user-initiated and already report. */
+async function jsonpGetRetry(params){
+  try{
+    return await jsonpGet(params);
+  }catch(err){
+    const soft = /did not answer in time|Could not reach/i.test(err.message || '');
+    if(!soft) throw err;
+    await new Promise(function(r){ setTimeout(r, SYNC.retryMs); });
+    return await jsonpGet(params);
+  }
 }
 
 /** A write is a GET with the payload packed into one parameter.
@@ -2822,6 +2848,42 @@ async function syncPost(body){
   return data;
 }
 
+/** Pull once; if it fails, retry on a widening backoff and again whenever
+ *  the tab becomes visible. Stops as soon as one attempt succeeds, or when
+ *  the user signs out. Never shows a toast for a background recovery — only
+ *  the badge changes, so it stays quiet.
+ *
+ *  Declared next to the sync engine, above lockApp(), because lockApp()
+ *  resets `_recovering` — a `let` still in its temporal dead zone would
+ *  throw if the user signed out before that later line ran. */
+let _recovering = false;
+function pullWithRecovery(){
+  if(_recovering) return;
+  _recovering = true;
+  const delays = [2000, 5000, 10000, 20000, 30000];
+  (async function attempt(){
+    let i = 0;
+    for(;;){
+      const ok = await syncPull({ silent: true });
+      if(ok || !isAuthed()){ _recovering = false; return; }
+      if(i >= delays.length) break;
+      await new Promise(r => setTimeout(r, delays[i++]));
+      if(!isAuthed()){ _recovering = false; return; }
+    }
+    _recovering = false;
+    // Out of retries — leave the badge as the explanation. The user can
+    // tap it, and the tab-visibility listener keeps trying in the background.
+    document.addEventListener('visibilitychange', onVisibleRetry);
+  })();
+}
+function onVisibleRetry(){
+  if(document.visibilityState === 'visible' && isAuthed() &&
+     state.sync.state !== 'ok'){
+    document.removeEventListener('visibilitychange', onVisibleRetry);
+    pullWithRecovery();
+  }
+}
+
 /* ---- sync status ---- */
 function setSyncState(s, msg){
   state.sync.state = s;
@@ -2839,6 +2901,9 @@ function renderSyncBadge(){
     return;
   }
   const s = state.sync;
+  // Every state except "offline" clears the retry handler, so a stale
+  // click target can never linger once a later pull has succeeded.
+  el.onclick = null;
   if(s.state === 'syncing'){
     el.className = 'sync-badge sync-busy';
     el.innerHTML = '&#8635;&nbsp; Syncing&hellip;';
@@ -2848,9 +2913,25 @@ function renderSyncBadge(){
   if(s.state === 'error' || s.state === 'offline'){
     el.className = 'sync-badge sync-err';
     el.innerHTML = '&#9888;&nbsp; Offline copy';
-    el.title = (s.msg || 'Could not reach the Sheet') + ' — showing the last copy saved in this browser.';
+    // Say what actually happened and what to do. The old text only ever
+    // said "could not reach the Sheet", which was wrong and unhelpful when
+    // the real cause was a slow first load on a phone.
+    const why = s.msg || 'Could not reach the Sheet';
+    const slow = /did not answer in time/i.test(why);
+    el.title = why + (slow
+      ? ' — this usually means the connection was slow rather than broken. '
+      : ' — showing the last copy saved in this browser. ') +
+      'Tap the badge to try again.';
+    el.style.cursor = 'pointer';
+    el.onclick = function(){
+      el.onclick = null;
+      syncPull().then(function(ok){
+        if(ok) toast('Synced from your Google Sheet.');
+      });
+    };
     return;
   }
+  el.style.cursor = '';
   if(s.state === 'ok'){
     const t = s.at ? s.at.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
     el.className = 'sync-badge sync-ok';
@@ -2868,7 +2949,7 @@ async function syncPull(opts){
   if(!syncConfigured()){ setSyncState('off'); return false; }
   setSyncState('syncing');
   try{
-    const data = await jsonpGet({ action: 'load' });
+    const data = await jsonpGetRetry({ action: 'load' });
     if(!data || !data.ok) throw new Error((data && data.error) || 'The Sheet refused the read.');
 
     if(!data.events || !data.events.length){
@@ -2891,11 +2972,15 @@ async function syncPull(opts){
         desc: e.desc || '', src: e.src || '', done: !!e.done
       };
     });
+    const changed = JSON.stringify(state.events) !== JSON.stringify(incoming);
     state.events = incoming;
     state.sync.rev = data.rev || 0;
     state.sample = false;
     save();
-    if(!opts.silent) render();
+    // A quiet background recovery (opts.silent) must still repaint when the
+    // data actually differs — otherwise the badge would read "Synced" next
+    // to a calendar still showing the stale list.
+    if(!opts.silent || changed) render();
     setSyncState('ok', incoming.length + ' events');
     return true;
   }catch(err){
@@ -3203,6 +3288,10 @@ function lockApp(){
   clearAuthed();
   state.role = null;
   state.who  = '';
+  // stopping the background recovery: otherwise a retry loop from the
+  // previous session keeps hitting the Sheet after the user has signed out
+  _recovering = false;
+  document.removeEventListener('visibilitychange', onVisibleRetry);
   document.documentElement.classList.add('locked');
   const pw=document.getElementById('gatePw');
   if(pw){ pw.value=''; pw.classList.remove('bad'); }
@@ -3308,10 +3397,11 @@ function startApp(){
   else { render(); }
   applyRole();
   renderSyncBadge();
-  // Google Sheets is the source of truth: pull on every sign-in so both the
-  // owner and any guest see the same calendar. Falls back to the local copy
-  // if the Sheet cannot be reached.
-  syncPull();
+  // Pull on every sign-in so the Sheet stays the master. If the first pull
+  // fails we now keep retrying quietly in the background: a phone that was
+  // briefly slow, or that woke up on a weak signal, recovers on its own
+  // instead of sitting on "Offline copy" until the user thinks to reload.
+  pullWithRecovery();
 }
 
 /* ================================================================
