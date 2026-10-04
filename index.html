@@ -2724,15 +2724,47 @@ function goToday(){
 /* ================================================================
    SYNC ENGINE
    ----------------------------------------------------------------
-   Reads go through JSONP (a <script> tag) because Apps Script does
-   not answer a CORS preflight. Writes go through fetch() with a
-   text/plain body — a "simple request", so again no preflight.
+   Reads AND writes both go through JSONP (a <script> tag).
+
+   Why not fetch() for the writes:
+   Apps Script replies to a POST with HTTP 302 to
+   script.googleusercontent.com. The fetch spec requires a 302 to be
+   re-issued as a GET, and the body is dropped — so the write lands in
+   doGet(), which does not know the write actions, and the change is
+   silently lost. Reads kept working, which is exactly why the app
+   looked fine on the device that made the edit and never updated on
+   any other device.
+
+   A GET has nothing to downgrade: the 302 is followed as a GET and
+   the request arrives intact. So every call is JSONP, and a write
+   carries its payload as a compact gzipped parameter.
 
    Nothing here trusts a write: after every push the app re-reads the
    revision from the Sheet and compares. A write that silently failed
    is reported as failed.
    ================================================================ */
 let _jsonpSeq = 0;
+
+/** gzip + base64url so a full event list still fits in a URL.
+ *  Falls back to plain base64 when CompressionStream is missing. */
+async function encodeForUrl(str){
+  const bytes = new TextEncoder().encode(str);
+  if(typeof CompressionStream === 'function'){
+    try{
+      const cs = new CompressionStream('gzip');
+      const stream = new Blob([bytes]).stream().pipeThrough(cs);
+      const buf = await new Response(stream).arrayBuffer();
+      return 'gz.' + b64url(new Uint8Array(buf));
+    }catch(e){ /* fall through to plain */ }
+  }
+  return 'pl.' + b64url(bytes);
+}
+function b64url(u8){
+  let s = '';
+  for(let i=0;i<u8.length;i++) s += String.fromCharCode(u8[i]);
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
 function jsonpGet(params){
   return new Promise(function(resolve, reject){
     if(!syncConfigured()){ reject(new Error('Sync is not set up.')); return; }
@@ -2772,32 +2804,22 @@ function jsonpGet(params){
   });
 }
 
+/** A write is a GET with the payload packed into one parameter.
+ *  Kept as syncPost() so every caller and every test stays the same. */
 async function syncPost(body){
   if(!syncConfigured()) throw new Error('Sync is not set up.');
-  body.token = SYNC.token;
-  body.who  = state.who  || '';
-  body.role = state.role || '';
-  const ctl = ('AbortController' in window) ? new AbortController() : null;
-  const timer = setTimeout(function(){ if(ctl) ctl.abort(); }, SYNC.timeoutMs);
-  try{
-    const res = await fetch(SYNC.url, {
-      method: 'POST',
-      // text/plain keeps this a CORS "simple request" — no preflight,
-      // which Apps Script cannot answer.
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body),
-      redirect: 'follow',
-      signal: ctl ? ctl.signal : undefined
-    });
-    const text = await res.text();
-    let data;
-    try{ data = JSON.parse(text); }
-    catch(e){ throw new Error('The Sheet sent an unexpected reply.'); }
-    if(!data.ok) throw new Error(data.error || 'The Sheet refused the write.');
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
+  const out = Object.assign({}, body, {
+    token: SYNC.token,
+    who:  state.who  || '',
+    role: state.role || ''
+  });
+  const data = await jsonpGet({
+    action: out.action,
+    payload: await encodeForUrl(JSON.stringify(out))
+  });
+  if(!data) throw new Error('The Sheet sent an unexpected reply.');
+  if(!data.ok) throw new Error(data.error || 'The Sheet refused the write.');
+  return data;
 }
 
 /* ---- sync status ---- */
