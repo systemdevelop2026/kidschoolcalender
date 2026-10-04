@@ -1286,7 +1286,7 @@ const STORE_KEY = 'school-events-calendar-v1';
    stuck on a cached copy can be spotted at a glance instead of guessed at.
    A stale cache cost real time on 2026-10-04: incognito worked while the
    normal window did not, purely because incognito had no cached file. */
-const APP_VERSION = '2026-10-04b';
+const APP_VERSION = '2026-10-04c';
 
 const SYNC = {
   url:   'https://script.google.com/macros/s/AKfycbwz9YvXx_C6rx1yPrf9OZHfEDKkn_EF4BQ3qYm41-dEPO0Tui4f3GQU3MSnrR28RDuczw/exec',
@@ -2825,6 +2825,13 @@ function jsonpGet(params){
  *  cold Apps Script container or a brief mobile-network stall — both of
  *  which succeed on the second attempt. Retrying hides that class of blip
  *  from the user entirely instead of showing them "Offline copy".
+ *
+ *  A third, distinct cause is a BLOCKED script request: the Sheet is read
+ *  through a <script> tag (JSONP), and an Android tablet with strict
+ *  privacy settings, an ad-blocker, or a filtering DNS will refuse that
+ *  third-party request outright. That fires onerror instantly and looks
+ *  identical to an outage. On the second attempt we probe whether the
+ *  device has network at all, so the badge can say which one it is.
  *  Writes never retry here; they are user-initiated and already report. */
 async function jsonpGetRetry(params){
   try{
@@ -2833,8 +2840,58 @@ async function jsonpGetRetry(params){
     const soft = /did not answer in time|Could not reach/i.test(err.message || '');
     if(!soft) throw err;
     await new Promise(function(r){ setTimeout(r, SYNC.retryMs); });
-    return await jsonpGet(params);
+    try{
+      return await jsonpGet(params);
+    }catch(err2){
+      // Still failing. Work out whether this device has any connectivity,
+      // so a blocked third-party script is reported as exactly that rather
+      // than as a vague "cannot reach the Sheet".
+      err2.blockedHint = await detectBlocked();
+      throw err2;
+    }
   }
+}
+
+/** True when the device is demonstrably ONLINE yet the request to the Sheet
+ *  still failed — which means the page is being filtered or blocked rather
+ *  than the device being offline.
+ *
+ *  Why this is only a *hint*, and why it stays deliberately conservative:
+ *  a <script>/<img> probe to an Apps Script URL cannot cleanly separate
+ *  "blocked" from "reachable but unhappy". Measured in real Chrome on a
+ *  healthy network, a request to a non-existent Apps Script deployment
+ *  fires **onerror** anyway (the endpoint answers, but with nothing
+ *  loadable), and every favicon on that host 302s to a gstatic CDN. So an
+ *  error on the Sheet host proves nothing on its own.
+ *
+ *  The one signal that IS reliable is narrower: if a neutral request to
+ *  gstatic completes, the device has working internet — so a failure that
+ *  happened only on the Sheet request was not a general outage. That is
+ *  enough to tell the user which of the two fix-it paths to take, without
+ *  ever claiming certainty we do not have.
+ *
+ *  Always resolves, and never reports "blocked" for a device that is merely
+ *  offline or slow. */
+async function detectBlocked(){
+  if(typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  // Only reliable probe: does general internet work at all? This must be a
+  // REAL IMAGE — a 204/empty response cannot be loaded by <img>, so an
+  // endpoint like gstatic/generate_204 fires onerror on a perfect network
+  // and would make every device look blocked.
+  return await probeImg('https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png?cb=' + Date.now(), 3500);
+}
+
+/** Resolves true if the <img> loads, false on error/timeout. */
+function probeImg(src, ms){
+  return new Promise(function(resolve){
+    let done = false;
+    const finish = function(v){ if(!done){ done = true; resolve(v); } };
+    const timer = setTimeout(function(){ finish(false); }, ms);
+    const img = new Image();
+    img.onload  = function(){ clearTimeout(timer); finish(true);  };
+    img.onerror = function(){ clearTimeout(timer); finish(false); };
+    img.src = src;
+  });
 }
 
 /** A write is a GET with the payload packed into one parameter.
@@ -2925,9 +2982,14 @@ function renderSyncBadge(){
     // the real cause was a slow first load on a phone.
     const why = s.msg || 'Could not reach the Sheet';
     const slow = /did not answer in time/i.test(why);
-    el.title = why + (slow
-      ? ' — this usually means the connection was slow rather than broken. '
-      : ' — showing the last copy saved in this browser. ') +
+    const blocked = /did not get through/i.test(why);
+    el.title = why + (blocked
+      ? ' — the device is online, so something is filtering this page. '
+      + 'Allow this site and script.google.com in any ad-blocker or DNS filter, '
+      + 'or try a different browser. '
+      : (slow
+        ? ' — this usually means the connection was slow rather than broken. '
+        : ' — showing the last copy saved in this browser. ')) +
       'Tap the badge to try again.  (' + appVersionTitle() + ')';
     el.style.cursor = 'pointer';
     el.onclick = function(){
@@ -2999,7 +3061,14 @@ async function syncPull(opts){
     return true;
   }catch(err){
     // Fall back to the cached copy so the calendar still opens offline.
-    setSyncState('offline', err.message || String(err));
+    // If the network itself is up but the Sheet request still failed, the
+    // device is filtering or blocking third-party scripts — name that,
+    // because the fix (allow the site) is completely different from the
+    // fix for an outage (move to better signal).
+    const msg = err && err.blockedHint
+      ? 'This device has internet, but the request to the Google Sheet did not get through.'
+      : (err.message || String(err));
+    setSyncState('offline', msg);
     return false;
   }
 }
@@ -3072,13 +3141,25 @@ async function showConnectionReport(){
   if(!p || !p.ok){
     const msg = String((p && p.error) || 'unknown error');
     const looksLocked = /sign|auth|401|403/i.test(msg);
+    // The check itself runs over the same <script> channel the app uses. If it
+    // fails while the device still has internet, the page is being filtered —
+    // a very common situation on a managed Android tablet.
+    const online = await detectBlocked();
     box.innerHTML =
       line(false, 'Cannot reach the Sheet', esc(msg)) +
-      '<div class="hint">Most likely your Apps Script deployment is not shared publicly. ' +
-      'In the script editor: <b>Deploy &rarr; Manage deployments &rarr; pencil icon &rarr; ' +
-      'Who has access: Anyone &rarr; Deploy</b>.' +
-      (looksLocked ? '' : ' If that is already set, check the token matches on both sides.') +
-      '</div>';
+      (online
+        ? '<div class="hint"><b>The device is online, so this request is being filtered.</b> ' +
+          'Something between this browser and Google is refusing it: an ad-blocker ' +
+          '(AdGuard, Blokada, Brave shields), a &ldquo;private DNS&rdquo; / DNS filter, ' +
+          'Chrome&rsquo;s site settings, a school or child-safe filter, or a ' +
+          'captive-portal Wi-Fi. Allow <code>systemdevelop2026.github.io</code> and ' +
+          '<code>script.google.com</code>, or try another browser or mobile data.</div>'
+        : '<div class="hint">The device looks offline, or the Sheet is unreachable. ' +
+          'Most likely your Apps Script deployment is not shared publicly. ' +
+          'In the script editor: <b>Deploy &rarr; Manage deployments &rarr; pencil icon &rarr; ' +
+          'Who has access: Anyone &rarr; Deploy</b>.' +
+          (looksLocked ? '' : ' If that is already set, check the token matches on both sides.') +
+          '</div>');
     return;
   }
 
