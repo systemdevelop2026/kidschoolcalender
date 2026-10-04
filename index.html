@@ -1281,6 +1281,13 @@ const STORE_KEY = 'school-events-calendar-v1';
    Fill these two in from SETUP.md step 6. Leave url empty to run the
    app standalone with no sync at all.
    ================================================================ */
+/* Bump this whenever index.html changes, and put the same string in
+   BUILD below. It is shown in ⋮ → Test the Sheet connection so a browser
+   stuck on a cached copy can be spotted at a glance instead of guessed at.
+   A stale cache cost real time on 2026-10-04: incognito worked while the
+   normal window did not, purely because incognito had no cached file. */
+const APP_VERSION = '2026-10-04b';
+
 const SYNC = {
   url:   'https://script.google.com/macros/s/AKfycbwz9YvXx_C6rx1yPrf9OZHfEDKkn_EF4BQ3qYm41-dEPO0Tui4f3GQU3MSnrR28RDuczw/exec',
   token: 'ngkaixuen_ngyeeching',
@@ -2921,7 +2928,7 @@ function renderSyncBadge(){
     el.title = why + (slow
       ? ' — this usually means the connection was slow rather than broken. '
       : ' — showing the last copy saved in this browser. ') +
-      'Tap the badge to try again.';
+      'Tap the badge to try again.  (' + appVersionTitle() + ')';
     el.style.cursor = 'pointer';
     el.onclick = function(){
       el.onclick = null;
@@ -2936,11 +2943,18 @@ function renderSyncBadge(){
     const t = s.at ? s.at.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
     el.className = 'sync-badge sync-ok';
     el.innerHTML = '&#10003;&nbsp; Synced ' + t;
-    el.title = 'Up to date with your Google Sheet' + (s.msg ? ' — ' + s.msg : '');
+    el.title = 'Up to date with your Google Sheet' + (s.msg ? ' — ' + s.msg : '') +
+      '  (' + appVersionTitle() + ')';
     return;
   }
   el.className = 'sync-badge sync-off';
   el.innerHTML = '&#9723;&nbsp; Not synced';
+}
+
+/** Shown in the connection report and the badge tooltip, so a browser stuck
+ *  on a cached copy of an older index.html can be identified immediately. */
+function appVersionTitle(){
+  return 'App version ' + APP_VERSION;
 }
 
 /* ---- pull: the Sheet always wins ---- */
@@ -3071,6 +3085,13 @@ async function showConnectionReport(){
   // 2. reachable and the token is good
   let html = line(true, 'Reached the Sheet', 'Named &ldquo;' + esc(p.sheet || '') + '&rdquo;');
   html += line(true, 'Token accepted', 'The token in index.html matches the one in the script');
+
+  // 2b. which build of index.html is actually running?
+  // A browser holding a cached copy of an older file is the classic cause of
+  // "it works in incognito but not in my normal window". Printing the version
+  // makes that visible instead of a guessing game.
+  html += line(true, 'App version ' + esc(APP_VERSION),
+    'If this differs from the file you last saved, this browser is showing a cached copy — hard-reload it');
 
   // 3. is the DEPLOYED SCRIPT the current one?
   let upToDate = false, why = '';
